@@ -19,6 +19,8 @@ function EventCard({ event }) {
         <p>{event.venue}</p>
         <div className="tags">
           <span>{event.category}</span>
+          {event.eventType === "multiday" && <span>Večdnevno</span>}
+          {event.duration && <span>{event.duration}</span>}
           {event.free && <span className="free">Brezplačno</span>}
           {!event.free && event.price && <span>{event.price}</span>}
         </div>
@@ -80,9 +82,7 @@ export default function EventExplorer({ periods }) {
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
               >
-                {expanded
-                  ? "Pokaži manj ↑"
-                  : `Pokaži vseh ${active.count} dogodkov ↓`}
+                {expanded ? "Pokaži manj ↑" : `Pokaži vseh ${active.count} dogodkov ↓`}
               </button>
             )}
           </>
@@ -95,7 +95,8 @@ export default function EventExplorer({ periods }) {
 
         <p className="data-status">
           Podatki: <a href="https://www.cele.si" target="_blank" rel="noreferrer">V Celu dogaja</a>
-          {" · "}samodejno osveževanje na 6 ur.
+          {" + "}<a href="https://www.celje.info/kam-v-celju/" target="_blank" rel="noreferrer">Celje.info</a>
+          {" · "}samodejno osveževanje na 6 ur · podvojene objave združujemo.
         </p>
       </div>
     </section>
