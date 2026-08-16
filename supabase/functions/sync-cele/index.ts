@@ -208,7 +208,8 @@ async function parseDetail(url: string, category: string) {
     title,
     slug,
     start_at: startAt,
-    end_at: null,
+    // cele.si currently exposes only the start date. Do not write end_at here:
+    // a second source may have enriched an existing row with a verified date range.
     all_day: false,
     venue,
     address: addressFromBody(bodyText, venue),
