@@ -96,6 +96,7 @@ export default function EventExplorer({ periods }) {
         <p className="data-status">
           Podatki: <a href="https://www.cele.si" target="_blank" rel="noreferrer">V Celu dogaja</a>
           {" + "}<a href="https://www.celje.info/kam-v-celju/" target="_blank" rel="noreferrer">Celje.info</a>
+          {" + "}<a href="https://www.visitcelje.eu/sl/kategorija-izdelka/kaj-poceti/dogodki/" target="_blank" rel="noreferrer">Visit Celje</a>
           {" · "}samodejno osveževanje na 6 ur · podvojene objave združujemo.
         </p>
       </div>
