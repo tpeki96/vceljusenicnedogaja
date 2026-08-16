@@ -63,7 +63,7 @@ export default async function Home() {
           </p>
         </div>
         <p className="demo-note">
-          Štejemo javno objavljene dogodke. Če česa še ni na seznamu, to ne pomeni, da se ne dogaja.
+          Glavni števec vključuje enkratne in aktivne večdnevne dogodke. Dolgotrajne razstave in programe vodimo ločeno pod »V teku«.
         </p>
       </section>
 
