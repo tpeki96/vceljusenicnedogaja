@@ -1,4 +1,7 @@
 import EventExplorer from "./EventExplorer";
+import { buildPeriods, fetchUpcomingEvents } from "../lib/events";
+
+export const revalidate = 300;
 
 function currentCeljeDate() {
   return new Intl.DateTimeFormat("sl-SI", {
@@ -11,8 +14,18 @@ function currentCeljeDate() {
     .toLocaleUpperCase("sl-SI");
 }
 
-export default function Home() {
+function eventWord(count) {
+  if (count === 1) return "dogodek";
+  if (count === 2) return "dogodka";
+  if (count === 3 || count === 4) return "dogodke";
+  return "dogodkov";
+}
+
+export default async function Home() {
   const dateLabel = currentCeljeDate();
+  const events = await fetchUpcomingEvents();
+  const periods = buildPeriods(events);
+  const todayCount = periods.today.count;
 
   return (
     <main>
@@ -23,7 +36,14 @@ export default function Home() {
         <nav>
           <a href="#dogodki">Dogodki</a>
           <a href="#projekt">O projektu</a>
-          <button className="add-event" type="button">+ Dodaj dogodek</button>
+          <a
+            className="add-event"
+            href="https://www.cele.si/dodaj-dogodek/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            + Dodaj dogodek
+          </a>
         </nav>
       </header>
 
@@ -35,17 +55,19 @@ export default function Home() {
           <span>nič ne dogaja.</span>
         </h1>
         <div className="counter-row">
-          <strong>18</strong>
+          <strong>{todayCount}</strong>
           <p>
-            dogodkov smo našli
+            {eventWord(todayCount)} smo našli
             <br />
             samo za danes.
           </p>
         </div>
-        <p className="demo-note">Zaenkrat demo podatki. Pravi dogodki pridejo v naslednji fazi.</p>
+        <p className="demo-note">
+          Štejemo javno objavljene dogodke. Če česa še ni na seznamu, to ne pomeni, da se ne dogaja.
+        </p>
       </section>
 
-      <EventExplorer />
+      <EventExplorer periods={periods} />
 
       <section className="manifesto wrap" id="projekt">
         <p className="eyebrow">DRUŽBENI EKSPERIMENT</p>
