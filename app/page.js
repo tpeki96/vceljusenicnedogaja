@@ -1,5 +1,5 @@
 import EventExplorer from "./EventExplorer";
-import { buildPeriods, fetchUpcomingEvents } from "../lib/events";
+import { buildPeriods, buildStats, fetchUpcomingEvents } from "../lib/events";
 
 export const revalidate = 300;
 
@@ -25,6 +25,7 @@ export default async function Home() {
   const dateLabel = currentCeljeDate();
   const events = await fetchUpcomingEvents();
   const periods = buildPeriods(events);
+  const stats = buildStats(events);
   const todayCount = periods.today.count;
 
   return (
@@ -35,15 +36,8 @@ export default async function Home() {
         </a>
         <nav>
           <a href="#dogodki">Dogodki</a>
+          <a href="#statistika">Statistika</a>
           <a href="#projekt">O projektu</a>
-          <a
-            className="add-event"
-            href="https://www.cele.si/dodaj-dogodek/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            + Dodaj dogodek
-          </a>
         </nav>
       </header>
 
@@ -68,6 +62,58 @@ export default async function Home() {
       </section>
 
       <EventExplorer periods={periods} />
+
+      <section className="stats-section" id="statistika">
+        <div className="wrap">
+          <div className="stats-head">
+            <div>
+              <p className="eyebrow">ŠTEJMO, ČE ŽE GOVORIMO</p>
+              <h2>
+                Naslednjih 30 dni.
+                <br />
+                <span>Po naših virih.</span>
+              </h2>
+            </div>
+            <p>
+              Živi prerez trenutno zajetih podatkov. Številke se samodejno osvežujejo skupaj z dogodki.
+            </p>
+          </div>
+
+          <div className="stats-grid">
+            <article>
+              <strong>{stats.eventCount}</strong>
+              <span>različnih dogodkov</span>
+              <small>enkratnih in večdnevnih</small>
+            </article>
+            <article>
+              <strong>{stats.freeCount}</strong>
+              <span>potrjeno brezplačnih</span>
+              <small>med dogodki v tem obdobju</small>
+            </article>
+            <article>
+              <strong>{stats.activeDays}</strong>
+              <span>dni, ko se nekaj dogaja</span>
+              <small>od naslednjih {stats.days} dni</small>
+            </article>
+            <article>
+              <strong>{stats.emptyDays}</strong>
+              <span>dni brez najdenega dogodka</span>
+              <small>po trenutno zajetih virih</small>
+            </article>
+          </div>
+
+          <div className="stats-punchline">
+            Najbolj nabit dan trenutno: <strong>{stats.busiestDayLabel}</strong> — {stats.busiestDayCount} {eventWord(stats.busiestDayCount)}.
+            {stats.ongoingCount > 0 && (
+              <> Poleg tega je danes v teku še {stats.ongoingCount} dolgotrajnih razstav ali programov.</>
+            )}
+          </div>
+
+          <p className="stats-note">
+            Statistika temelji na javno objavljenih podatkih virov V Celu dogaja, Celje.info in Visit Celje. Ne predstavlja uradne ali popolne evidence vseh dogodkov v Celju.
+          </p>
+        </div>
+      </section>
 
       <section className="manifesto wrap" id="projekt">
         <p className="eyebrow">DRUŽBENI EKSPERIMENT</p>
