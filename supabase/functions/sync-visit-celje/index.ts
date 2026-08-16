@@ -6,20 +6,21 @@ const BASE_URL = "https://www.visitcelje.eu";
 const LIST_ROOT = `${BASE_URL}/sl/kategorija-izdelka/kaj-poceti/dogodki/`;
 const TIME_ZONE = "Europe/Ljubljana";
 const USER_AGENT = "Mozilla/5.0 (compatible; VCeljuSeNicNeDogaja/1.0; +https://vceljusenicnedogaja.si)";
-const HORIZON_DAYS = 240;
+const HORIZON_DAYS = 120;
 const MAX_PAGES = 40;
+const MAX_DETAILS_PER_RUN = 48;
 
 const OUT_OF_AREA = [
   /\bžalec\b/i,
   /\bzalec\b/i,
   /gornja radgona/i,
   /pomurski sejem/i,
-  /laško/i,
-  /lasko/i,
-  /šentjur/i,
-  /sentjur/i,
-  /doberna/i,
-  /vojnik/i,
+  /\blaško\b/i,
+  /\blasko\b/i,
+  /\bšentjur\b/i,
+  /\bsentjur\b/i,
+  /\bdobrna\b/i,
+  /\bvojnik\b/i,
   /slovenske konjice/i,
 ];
 
@@ -31,7 +32,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchHtml(url: string, attempts = 4) {
+async function fetchHtml(url: string, attempts = 3) {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
@@ -46,7 +47,7 @@ async function fetchHtml(url: string, attempts = 4) {
 
       if (response.status === 429) {
         const retryAfter = Number(response.headers.get("retry-after")) || 2 ** (attempt + 1);
-        await sleep(Math.min(retryAfter * 1000, 16000));
+        await sleep(Math.min(retryAfter * 1000, 10000));
         continue;
       }
       if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
@@ -58,10 +59,20 @@ async function fetchHtml(url: string, attempts = 4) {
       return html;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (attempt < attempts - 1) await sleep(1200 * (attempt + 1));
+      if (attempt < attempts - 1) await sleep(700 * (attempt + 1));
     }
   }
   throw lastError ?? new Error(`Failed to fetch ${url}`);
+}
+
+async function mapBatches<T, R>(items: T[], concurrency: number, pauseMs: number, fn: (item: T) => Promise<R>) {
+  const output: R[] = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    output.push(...(await Promise.all(batch.map(fn))));
+    if (i + concurrency < items.length) await sleep(pauseMs);
+  }
+  return output;
 }
 
 function timeZoneOffsetMs(timestamp: number) {
@@ -76,11 +87,10 @@ function timeZoneOffsetMs(timestamp: number) {
     hourCycle: "h23",
   }).formatToParts(new Date(timestamp));
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const asUtc = Date.UTC(
+  return Date.UTC(
     Number(values.year), Number(values.month) - 1, Number(values.day),
     Number(values.hour), Number(values.minute), Number(values.second),
-  );
-  return asUtc - timestamp;
+  ) - timestamp;
 }
 
 function localDateTimeToIso(
@@ -92,16 +102,17 @@ function localDateTimeToIso(
   const minute = time?.minute ?? (endOfDay ? 59 : 0);
   const second = endOfDay && !time ? 59 : 0;
   const wallClock = Date.UTC(date.year, date.month - 1, date.day, hour, minute, second);
-  let offset = timeZoneOffsetMs(wallClock);
-  let utc = wallClock - offset;
-  offset = timeZoneOffsetMs(utc);
-  utc = wallClock - offset;
+  let utc = wallClock - timeZoneOffsetMs(wallClock);
+  utc = wallClock - timeZoneOffsetMs(utc);
   return new Date(utc).toISOString();
 }
 
 function dateKey(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).formatToParts(date);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
@@ -137,11 +148,9 @@ function parseListDate(text: string) {
     };
   }
   const single = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\b/);
-  if (single) {
-    const date = { day: Number(single[1]), month: Number(single[2]), year: Number(single[3]) };
-    return { start: date, end: date };
-  }
-  return null;
+  if (!single) return null;
+  const date = { day: Number(single[1]), month: Number(single[2]), year: Number(single[3]) };
+  return { start: date, end: date };
 }
 
 function parseDetailDate(value: string | null) {
@@ -155,16 +164,16 @@ function parseDetailDate(value: string | null) {
 }
 
 function fieldAfterHeading($: ReturnType<typeof load>, label: string) {
-  const heading = $("h1,h2,h3,h4,h5,h6").filter((_i, el) => clean($(el).text()).toLocaleLowerCase("sl-SI") === label.toLocaleLowerCase("sl-SI")).first();
+  const heading = $("h1,h2,h3,h4,h5,h6")
+    .filter((_i, el) => clean($(el).text()).toLocaleLowerCase("sl-SI") === label.toLocaleLowerCase("sl-SI"))
+    .first();
+
   if (heading.length) {
     let node = heading.next();
     for (let i = 0; i < 5 && node.length; i += 1, node = node.next()) {
       const value = clean(node.text());
       if (value) return value;
     }
-    const parentText = clean(heading.parent().text());
-    const stripped = clean(parentText.replace(new RegExp(`^${label}\\s*`, "i"), ""));
-    if (stripped && stripped.toLocaleLowerCase("sl-SI") !== label.toLocaleLowerCase("sl-SI")) return stripped;
   }
 
   const main = clean($("main").text() || $("body").text());
@@ -195,6 +204,10 @@ function eventUrl(href: string | undefined) {
   }
 }
 
+function slugFromUrl(url: string) {
+  return new URL(url).pathname.split("/").filter(Boolean).pop()!;
+}
+
 function pageNumber(href: string | undefined) {
   if (!href) return null;
   try {
@@ -204,12 +217,6 @@ function pageNumber(href: string | undefined) {
   } catch {
     return null;
   }
-}
-
-function locationStatus(location: string | null, content: string) {
-  const haystack = `${location ?? ""} ${content}`;
-  if (OUT_OF_AREA.some((pattern) => pattern.test(haystack))) return "out_of_area" as const;
-  return "in_area" as const;
 }
 
 function inferCategory(title: string, content: string) {
@@ -241,16 +248,10 @@ function normalizeTitle(value: string) {
     .replace(/^poletje\s+v\s+celju\s+\d{4}\s*[|:\-–]\s*/i, "")
     .replace(/^\s*(koncert|dogodek|predstava|prireditev|festival)\s*[:\-–]\s*/i, "")
     .replace(/\b(?:1|2|3|4|5)\.?\s*dan\b/gi, "")
-    .replace(/\b(?:prvi|drugi|tretji|cetrti|peti)\s+dan\b/gi, "")
     .replace(/&/g, " in ")
     .replace(/[^a-z0-9čšž]+/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function tokens(value: string) {
-  const stop = new Set(["v", "na", "in", "za", "z", "s", "pri", "po", "the"]);
-  return normalizeTitle(value).split(" ").filter((token) => token.length > 1 && !stop.has(token));
 }
 
 function textSimilarity(a: string | null, b: string | null) {
@@ -260,8 +261,8 @@ function textSimilarity(a: string | null, b: string | null) {
   if (!na || !nb) return 0;
   if (na === nb) return 1;
   if ((na.includes(nb) || nb.includes(na)) && Math.min(na.length, nb.length) >= 7) return 0.94;
-  const aa = new Set(tokens(a));
-  const bb = new Set(tokens(b));
+  const aa = new Set(na.split(" ").filter((token) => token.length > 1));
+  const bb = new Set(nb.split(" ").filter((token) => token.length > 1));
   const intersection = [...aa].filter((token) => bb.has(token)).length;
   const union = new Set([...aa, ...bb]).size;
   return union ? intersection / union : 0;
@@ -284,7 +285,6 @@ async function parseDetail(url: string) {
   const location = fieldAfterHeading($, "Lokacija");
   const start = parseDetailDate(startText);
   const end = parseDetailDate(endText) ?? start;
-
   if (!title || !start || !end) throw new Error(`Could not parse title/date for ${url}`);
 
   const eventType = classifyEvent(start.date, end.date);
@@ -295,14 +295,13 @@ async function parseDetail(url: string) {
 
   const content = detailContent($);
   const { isFree, priceText } = priceAndFree(content, title);
-  const locStatus = locationStatus(location, content);
   const imageUrl = $("meta[property='og:image']").attr("content") || $("meta[name='twitter:image']").attr("content") || null;
-  const slug = new URL(url).pathname.split("/").filter(Boolean).pop()!;
+  const locStatus = location && OUT_OF_AREA.some((pattern) => pattern.test(location)) ? "out_of_area" : "in_area";
 
   return {
-    source_event_id: slug,
+    source_event_id: slugFromUrl(url),
     title,
-    slug,
+    slug: slugFromUrl(url),
     start_at: startAt,
     end_at: endAt,
     all_day: !start.time,
@@ -335,12 +334,13 @@ Deno.serve(async (req: Request) => {
   );
 
   const { data: source, error: sourceError } = await supabase
-    .from("sources").select("id,last_synced_at").eq("key", "visit-celje").single();
-  if (sourceError || !source) {
-    return Response.json({ ok: false, error: sourceError?.message ?? "Source missing" }, { status: 500 });
-  }
+    .from("sources")
+    .select("id,last_synced_at")
+    .eq("key", "visit-celje")
+    .single();
+  if (sourceError || !source) return Response.json({ ok: false, error: sourceError?.message ?? "Source missing" }, { status: 500 });
 
-  if (source.last_synced_at && Date.now() - new Date(source.last_synced_at).getTime() < 4 * 60 * 60 * 1000) {
+  if (source.last_synced_at && Date.now() - new Date(source.last_synced_at).getTime() < 20 * 60 * 1000) {
     return Response.json({ ok: true, skipped: true, reason: "recently_synced" });
   }
 
@@ -350,13 +350,7 @@ Deno.serve(async (req: Request) => {
   const candidates = new Map<string, { startKey: string; endKey: string }>();
   const warnings: string[] = [];
 
-  let firstHtml: string;
-  try {
-    firstHtml = await fetchHtml(LIST_ROOT);
-  } catch (error) {
-    return Response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
-  }
-
+  const firstHtml = await fetchHtml(LIST_ROOT);
   const first$ = load(firstHtml);
   let maxPage = 1;
   first$("a[href]").each((_i, element) => {
@@ -365,63 +359,64 @@ Deno.serve(async (req: Request) => {
   });
   maxPage = Math.min(maxPage, MAX_PAGES);
 
-  async function collect(html: string) {
+  function collect(html: string) {
     const $ = load(html);
     $("a[href]").each((_i, element) => {
       const url = eventUrl($(element).attr("href"));
       if (!url) return;
-      const dateRange = parseListDate($(element).text());
-      if (!dateRange) return;
-      const startKey = `${dateRange.start.year}-${String(dateRange.start.month).padStart(2, "0")}-${String(dateRange.start.day).padStart(2, "0")}`;
-      const endKey = `${dateRange.end.year}-${String(dateRange.end.month).padStart(2, "0")}-${String(dateRange.end.day).padStart(2, "0")}`;
+      const range = parseListDate($(element).text());
+      if (!range) return;
+      const startKey = `${range.start.year}-${String(range.start.month).padStart(2, "0")}-${String(range.start.day).padStart(2, "0")}`;
+      const endKey = `${range.end.year}-${String(range.end.month).padStart(2, "0")}-${String(range.end.day).padStart(2, "0")}`;
       if (endKey < lower || startKey > upper) return;
       candidates.set(url, { startKey, endKey });
     });
   }
 
-  await collect(firstHtml);
-  for (let page = 2; page <= maxPage; page += 1) {
-    await sleep(650);
+  collect(firstHtml);
+  const otherPages = Array.from({ length: Math.max(0, maxPage - 1) }, (_v, i) => i + 2);
+  await mapBatches(otherPages, 3, 350, async (page) => {
     try {
-      const html = await fetchHtml(`${LIST_ROOT}page/${page}/`);
-      await collect(html);
+      collect(await fetchHtml(`${LIST_ROOT}page/${page}/`));
     } catch (error) {
       warnings.push(`page ${page}: ${error instanceof Error ? error.message : String(error)}`);
-      if (/429/.test(warnings[warnings.length - 1])) break;
     }
-  }
+    return null;
+  });
 
   if (!candidates.size) {
     return Response.json({ ok: false, error: "No current/future Visit Celje events discovered", pages_scanned: maxPage, warnings }, { status: 502 });
   }
 
+  const { data: knownRows } = await supabase
+    .from("events")
+    .select("source_event_id")
+    .eq("source_id", source.id);
+  const known = new Set((knownRows ?? []).map((row) => row.source_event_id));
+
+  const ordered = [...candidates.entries()].sort((a, b) => a[1].startKey.localeCompare(b[1].startKey));
+  const newCandidates = ordered.filter(([url]) => !known.has(slugFromUrl(url)));
+  const existingCandidates = ordered.filter(([url]) => known.has(slugFromUrl(url)));
+  const work = [...newCandidates, ...existingCandidates].slice(0, MAX_DETAILS_PER_RUN);
+
   const failures: string[] = [];
-  const parsed: Array<Awaited<ReturnType<typeof parseDetail>>> = [];
-  for (const url of candidates.keys()) {
-    await sleep(700);
+  const parsedResults = await mapBatches(work, 2, 450, async ([url]) => {
     try {
-      parsed.push(await parseDetail(url));
+      return await parseDetail(url);
     } catch (error) {
       failures.push(`${url}: ${error instanceof Error ? error.message : String(error)}`);
-      if (failures.filter((item) => /429/.test(item)).length >= 3) break;
+      return null;
     }
-  }
+  });
+  const parsed = parsedResults.filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const nowIso = new Date().toISOString();
-  const rows = parsed.map((event) => ({
-    ...event,
-    source_id: source.id,
-    last_seen_at: nowIso,
-    updated_at: nowIso,
-  }));
-
+  const rows = parsed.map((event) => ({ ...event, source_id: source.id, last_seen_at: nowIso, updated_at: nowIso }));
   const { data: imported, error: upsertError } = await supabase
     .from("events")
     .upsert(rows, { onConflict: "source_id,source_event_id" })
     .select("id,title,start_at,end_at,venue,event_type,status,location_status");
-  if (upsertError) {
-    return Response.json({ ok: false, error: upsertError.message, parsed: rows.length }, { status: 500 });
-  }
+  if (upsertError) return Response.json({ ok: false, error: upsertError.message, parsed: rows.length }, { status: 500 });
 
   const published = (imported ?? []).filter((event) => event.status === "published");
   let deduped = 0;
@@ -431,7 +426,7 @@ Deno.serve(async (req: Request) => {
   if (published.length) {
     const minStart = new Date(Math.min(...published.map((event) => new Date(event.start_at).getTime())) - 86400000).toISOString();
     const maxEnd = new Date(Math.max(...published.map((event) => new Date(event.end_at ?? event.start_at).getTime())) + 86400000).toISOString();
-    const { data: existing, error: existingError } = await supabase
+    const { data: existing } = await supabase
       .from("events")
       .select("id,title,start_at,end_at,venue,event_type,source_id,duplicate_of")
       .neq("source_id", source.id)
@@ -439,52 +434,39 @@ Deno.serve(async (req: Request) => {
       .eq("status", "published")
       .gte("start_at", minStart)
       .lte("start_at", maxEnd);
-    if (existingError) return Response.json({ ok: false, error: existingError.message }, { status: 500 });
 
     for (const event of published) {
-      const matches = (existing ?? [])
+      const direct = (existing ?? [])
         .map((candidate) => {
           const titleScore = textSimilarity(event.title, candidate.title);
           const venueScore = textSimilarity(event.venue, candidate.venue);
-          const overlap = rangesOverlap(event.start_at, event.end_at, candidate.start_at, candidate.end_at);
-          if (!overlap || titleScore < 0.72) return null;
-
-          // A months-long umbrella programme is not the same thing as one matching daily occurrence.
+          if (!rangesOverlap(event.start_at, event.end_at, candidate.start_at, candidate.end_at) || titleScore < 0.72) return null;
           if (event.event_type === "ongoing" && candidate.event_type === "single") return null;
-
           const sameStart = isoDateKey(event.start_at) === isoDateKey(candidate.start_at);
-          const score = titleScore * 0.80 + venueScore * 0.12 + (sameStart ? 0.08 : 0.03);
-          return { candidate, titleScore, venueScore, score };
+          return { candidate, titleScore, venueScore, score: titleScore * 0.8 + venueScore * 0.12 + (sameStart ? 0.08 : 0.03) };
         })
         .filter((item): item is NonNullable<typeof item> => Boolean(item))
         .sort((a, b) => b.score - a.score);
 
       const eventStart = isoDateKey(event.start_at)!;
       const eventEnd = isoDateKey(event.end_at ?? event.start_at)!;
-      const seriesMatches = (existing ?? [])
-        .map((candidate) => ({
-          candidate,
-          titleScore: textSimilarity(event.title, candidate.title),
-          venueScore: textSimilarity(event.venue, candidate.venue),
-        }))
+      const series = (existing ?? [])
+        .map((candidate) => ({ candidate, titleScore: textSimilarity(event.title, candidate.title), venueScore: textSimilarity(event.venue, candidate.venue) }))
         .filter((item) => {
           const candidateDate = isoDateKey(item.candidate.start_at)!;
           return event.event_type === "multiday" && item.titleScore >= 0.82 && candidateDate >= eventStart && candidateDate <= eventEnd;
         });
-      const distinctSeriesDates = new Set(seriesMatches.map((item) => isoDateKey(item.candidate.start_at)));
-      const seriesSplit = distinctSeriesDates.size >= 2;
+      const seriesDates = new Set(series.map((item) => isoDateKey(item.candidate.start_at)));
+      const seriesSplit = seriesDates.size >= 2;
 
-      let best = matches[0] ?? null;
-      if (seriesSplit) {
-        best = seriesMatches
-          .sort((a, b) => (b.titleScore + b.venueScore * 0.1) - (a.titleScore + a.venueScore * 0.1))[0] as typeof best;
-      }
+      let best: any = direct[0] ?? null;
+      if (seriesSplit) best = series.sort((a, b) => (b.titleScore + b.venueScore * 0.1) - (a.titleScore + a.venueScore * 0.1))[0] ?? null;
       if (!best) continue;
-      const score = "score" in best ? best.score : Math.min(1, best.titleScore * 0.9 + best.venueScore * 0.1);
+      const score = typeof best.score === "number" ? best.score : Math.min(1, best.titleScore * 0.9 + best.venueScore * 0.1);
       if (!seriesSplit && score < 0.78) continue;
 
       const reason = seriesSplit
-        ? `series_split:${distinctSeriesDates.size}_daily_records`
+        ? `series_split:${seriesDates.size}_daily_records`
         : `title:${best.titleScore.toFixed(2)},venue:${best.venueScore.toFixed(2)}`;
 
       await supabase.from("events").update({
@@ -497,20 +479,11 @@ Deno.serve(async (req: Request) => {
       if (seriesSplit) seriesCollapsed += 1;
 
       if (!seriesSplit && event.end_at && !best.candidate.end_at && event.event_type !== "ongoing") {
-        await supabase.from("events").update({
-          end_at: event.end_at,
-          event_type: event.event_type,
-          updated_at: nowIso,
-        }).eq("id", best.candidate.id);
+        await supabase.from("events").update({ end_at: event.end_at, event_type: event.event_type, updated_at: nowIso }).eq("id", best.candidate.id);
       }
 
       if (dedupeExamples.length < 10) {
-        dedupeExamples.push({
-          incoming: event.title,
-          canonical: best.candidate.title,
-          confidence: Number(score.toFixed(3)),
-          reason,
-        });
+        dedupeExamples.push({ incoming: event.title, canonical: best.candidate.title, confidence: Number(score.toFixed(3)), reason });
       }
     }
   }
@@ -521,6 +494,8 @@ Deno.serve(async (req: Request) => {
     ok: true,
     pages_scanned: maxPage,
     discovered_current_or_future: candidates.size,
+    selected_for_detail: work.length,
+    remaining_new_estimate: Math.max(0, newCandidates.length - work.length),
     imported: rows.length,
     hidden_out_of_area: rows.filter((row) => row.location_status === "out_of_area").length,
     failed: failures.length,
