@@ -252,12 +252,51 @@ nav {
   text-align: right;
 }
 
+.all-events {
+  margin-top: 34px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+}
+
+.all-events:hover {
+  border-color: white;
+}
+
+.empty-events {
+  min-height: 180px;
+  border-top: 1px solid rgba(255, 255, 255, 0.24);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.empty-events strong {
+  font-size: clamp(24px, 4vw, 38px);
+  letter-spacing: -0.04em;
+}
+
+.empty-events span {
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .data-status {
   margin: 34px 0 0;
   color: rgba(255, 255, 255, 0.48);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+.data-status a {
+  color: rgba(255, 255, 255, 0.78);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .manifesto {
@@ -307,7 +346,7 @@ footer {
     min-height: 72px;
   }
 
-  .site-header nav a {
+  .site-header nav > a:not(.add-event) {
     display: none;
   }
 
@@ -345,13 +384,13 @@ footer {
   }
 
   .event-card {
-    grid-template-columns: 70px 1fr 24px;
+    grid-template-columns: 76px 1fr 24px;
     gap: 14px;
     min-height: 132px;
   }
 
   .event-time {
-    font-size: 18px;
+    font-size: 17px;
   }
 
   .event-main p {
