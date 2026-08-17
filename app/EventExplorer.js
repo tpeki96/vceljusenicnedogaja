@@ -25,7 +25,11 @@ function EventCard({ event }) {
           {!event.free && event.price && <span>{event.price}</span>}
         </div>
       </div>
-      <div className="event-arrow" aria-hidden="true">↗</div>
+      <div className="event-arrow" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M7 17 17 7M9 7h8v8" />
+        </svg>
+      </div>
     </a>
   );
 }
