@@ -46,7 +46,7 @@ export default async function Home() {
         <h1>
           V Celju se danes
           <br />
-          <span>nič ne dogaja.</span>
+          <span>nič ne</span> dogaja.
         </h1>
         <div className="counter-row">
           <strong>{todayCount}</strong>
