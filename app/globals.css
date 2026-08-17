@@ -190,7 +190,7 @@ nav {
 
 .event-card {
   display: grid;
-  grid-template-columns: 110px 1fr 40px;
+  grid-template-columns: 110px minmax(0, 1fr) 48px;
   gap: 26px;
   align-items: center;
   min-height: 142px;
@@ -240,8 +240,34 @@ nav {
 }
 
 .event-arrow {
-  font-size: 28px;
-  text-align: right;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: white;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.event-arrow svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.event-card:hover .event-arrow,
+.event-card:focus-visible .event-arrow {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translate(2px, -2px);
 }
 
 .all-events {
@@ -490,7 +516,7 @@ footer {
   }
 
   .event-card {
-    grid-template-columns: 76px 1fr 24px;
+    grid-template-columns: 76px minmax(0, 1fr) 42px;
     gap: 14px;
     min-height: 132px;
   }
@@ -501,6 +527,16 @@ footer {
 
   .event-main p {
     font-size: 13px;
+  }
+
+  .event-arrow {
+    width: 40px;
+    height: 40px;
+  }
+
+  .event-arrow svg {
+    width: 18px;
+    height: 18px;
   }
 
   .stats-section {
