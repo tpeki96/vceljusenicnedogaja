@@ -3,7 +3,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const TARGET_LANGUAGES = ["en", "de", "it"] as const;
-const MAX_PAIRS_PER_RUN = 45;
+const MAX_PAIRS_PER_RUN = 90;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 type TargetLanguage = (typeof TARGET_LANGUAGES)[number];
 
@@ -11,6 +12,9 @@ type EventRow = {
   id: string;
   title: string;
   category: string | null;
+  start_at: string;
+  end_at: string | null;
+  event_type: "single" | "multiday" | "ongoing";
   updated_at: string;
 };
 
@@ -139,10 +143,27 @@ async function googleTranslate(text: string, target: TargetLanguage) {
   throw new Error(`Google Translate failed: ${lastError}`);
 }
 
+function eventPriority(event: EventRow, nowMs: number) {
+  const start = Date.parse(event.start_at);
+  const end = Date.parse(event.end_at || event.start_at);
+
+  // First: things users are likely to see right now — currently active events
+  // and single events that started earlier today.
+  if ((start <= nowMs && end >= nowMs) || (start <= nowMs && start >= nowMs - DAY_MS)) {
+    return [0, start] as const;
+  }
+
+  // Second: upcoming events, nearest first.
+  if (start > nowMs) return [1, start] as const;
+
+  // Last: old records kept for completeness/backfill.
+  return [2, -start] as const;
+}
+
 Deno.serve(async () => {
   try {
     const events = await supabaseGet<EventRow[]>(
-      "events?select=id,title,category,updated_at&status=eq.published&duplicate_of=is.null&location_status=eq.in_area&order=updated_at.desc&limit=600",
+      "events?select=id,title,category,start_at,end_at,event_type,updated_at&status=eq.published&duplicate_of=is.null&location_status=eq.in_area&limit=600",
     );
     const translations = await supabaseGet<TranslationRow[]>(
       "event_translations?select=event_id,language,source_hash,manual_override&limit=2000",
@@ -152,13 +173,20 @@ Deno.serve(async () => {
       translations.map((row) => [`${row.event_id}:${row.language}`, row]),
     );
 
+    const nowMs = Date.now();
+    const prioritizedEvents = [...events].sort((a, b) => {
+      const ap = eventPriority(a, nowMs);
+      const bp = eventPriority(b, nowMs);
+      return ap[0] - bp[0] || ap[1] - bp[1];
+    });
+
     const work: Array<{
       event: EventRow;
       language: TargetLanguage;
       sourceHash: string;
     }> = [];
 
-    for (const event of events) {
+    for (const event of prioritizedEvents) {
       const sourceHash = await sha256(`${event.title}\u0000${event.category || ""}`);
       for (const language of TARGET_LANGUAGES) {
         const row = existing.get(`${event.id}:${language}`);
