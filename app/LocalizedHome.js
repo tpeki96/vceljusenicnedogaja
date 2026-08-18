@@ -66,7 +66,7 @@ export default async function LocalizedHome({ lang = "sl" }) {
         <p className="demo-note">{copy.hero.note}</p>
       </section>
 
-      <EventExplorer periods={periods} copy={copy.events} />
+      <EventExplorer periods={periods} lang={lang} />
 
       <section className="stats-section" id="statistika">
         <div className="wrap">
