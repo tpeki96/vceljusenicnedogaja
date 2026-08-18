@@ -2,14 +2,16 @@ do $$
 declare
   existing_job bigint;
 begin
-  for existing_job in select jobid from cron.job where jobname = 'translate-events-hourly'
+  for existing_job in
+    select jobid from cron.job
+    where jobname in ('translate-events-hourly', 'translate-events-every-15-minutes')
   loop
     perform cron.unschedule(existing_job);
   end loop;
 
   perform cron.schedule(
-    'translate-events-hourly',
-    '12 * * * *',
+    'translate-events-every-15-minutes',
+    '*/15 * * * *',
     $cron$
       select net.http_post(
         url := (select decrypted_secret from vault.decrypted_secrets where name='project_url' order by created_at desc limit 1) || '/functions/v1/translate-events',
