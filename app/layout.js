@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./i18n.css";
 
 export const metadata = {
   title: "V Celju se nič ne dogaja",
