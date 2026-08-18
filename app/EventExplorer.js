@@ -4,14 +4,14 @@ import { useMemo, useState } from "react";
 
 const INITIAL_LIMIT = 8;
 
-function EventCard({ event }) {
+function EventCard({ event, copy }) {
   return (
     <a
       className="event-card"
       href={event.url}
       target="_blank"
       rel="noreferrer"
-      aria-label={`${event.title} – odpri originalni dogodek`}
+      aria-label={`${event.title} – ${copy.openOriginal}`}
     >
       <div className="event-time">{event.time}</div>
       <div className="event-main">
@@ -19,9 +19,9 @@ function EventCard({ event }) {
         <p>{event.venue}</p>
         <div className="tags">
           <span>{event.category}</span>
-          {event.eventType === "multiday" && <span>Večdnevno</span>}
+          {event.eventType === "multiday" && <span>{copy.multiDay}</span>}
           {event.duration && <span>{event.duration}</span>}
-          {event.free && <span className="free">Brezplačno</span>}
+          {event.free && <span className="free">{copy.free}</span>}
           {!event.free && event.price && <span>{event.price}</span>}
         </div>
       </div>
@@ -34,7 +34,7 @@ function EventCard({ event }) {
   );
 }
 
-export default function EventExplorer({ periods }) {
+export default function EventExplorer({ periods, copy }) {
   const [activeKey, setActiveKey] = useState("today");
   const [expanded, setExpanded] = useState(false);
   const active = periods[activeKey];
@@ -54,10 +54,10 @@ export default function EventExplorer({ periods }) {
       <div className="wrap">
         <div className="section-head">
           <div>
-            <p className="eyebrow">NO, PA POGLEJMO</p>
+            <p className="eyebrow">{copy.eyebrow}</p>
             <h2>{active.heading}</h2>
           </div>
-          <div className="day-tabs" aria-label="Izbira obdobja">
+          <div className="day-tabs" aria-label={copy.tabsAria}>
             {Object.entries(periods).map(([key, period]) => (
               <button
                 key={key}
@@ -76,7 +76,7 @@ export default function EventExplorer({ periods }) {
           <>
             <div className="event-list">
               {visibleEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard key={event.id} event={event} copy={copy} />
               ))}
             </div>
 
@@ -86,22 +86,22 @@ export default function EventExplorer({ periods }) {
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
               >
-                {expanded ? "Pokaži manj ↑" : `Pokaži vseh ${active.count} dogodkov ↓`}
+                {expanded ? copy.showLess : copy.showAll(active.count)}
               </button>
             )}
           </>
         ) : (
           <div className="empty-events">
-            <strong>No, zdaj pa mogoče res nič.</strong>
-            <span>Za izbrano obdobje trenutno nimamo najdenega dogodka.</span>
+            <strong>{copy.emptyTitle}</strong>
+            <span>{copy.emptyText}</span>
           </div>
         )}
 
         <p className="data-status">
-          Podatki: <a href="https://www.cele.si" target="_blank" rel="noreferrer">V Celu dogaja</a>
+          {copy.dataPrefix} <a href="https://www.cele.si" target="_blank" rel="noreferrer">V Celu dogaja</a>
           {" + "}<a href="https://www.celje.info/kam-v-celju/" target="_blank" rel="noreferrer">Celje.info</a>
           {" + "}<a href="https://www.visitcelje.eu/sl/kategorija-izdelka/kaj-poceti/dogodki/" target="_blank" rel="noreferrer">Visit Celje</a>
-          {" · "}samodejno osveževanje na 6 ur · podvojene objave združujemo.
+          {" · "}{copy.dataSuffix}
         </p>
       </div>
     </section>
