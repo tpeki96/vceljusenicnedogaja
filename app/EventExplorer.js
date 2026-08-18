@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { getCopy } from "../lib/i18n";
 
 const INITIAL_LIMIT = 8;
 
@@ -34,7 +35,8 @@ function EventCard({ event, copy }) {
   );
 }
 
-export default function EventExplorer({ periods, copy }) {
+export default function EventExplorer({ periods, lang = "sl" }) {
+  const copy = getCopy(lang).events;
   const [activeKey, setActiveKey] = useState("today");
   const [expanded, setExpanded] = useState(false);
   const active = periods[activeKey];
