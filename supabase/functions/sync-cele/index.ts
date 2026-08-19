@@ -21,37 +21,47 @@ const CATEGORIES = [
 ] as const;
 
 const MONTHS: Record<string, number> = {
-  januar: 1,
-  januarja: 1,
-  februar: 2,
-  februarja: 2,
-  marec: 3,
-  marca: 3,
-  april: 4,
-  aprila: 4,
-  maj: 5,
-  maja: 5,
-  junij: 6,
-  junija: 6,
-  julij: 7,
-  julija: 7,
-  avgust: 8,
-  avgusta: 8,
-  september: 9,
-  septembra: 9,
-  oktober: 10,
-  oktobra: 10,
-  november: 11,
-  novembra: 11,
-  december: 12,
-  decembra: 12,
+  januar: 1, januarja: 1, februar: 2, februarja: 2, marec: 3, marca: 3,
+  april: 4, aprila: 4, maj: 5, maja: 5, junij: 6, junija: 6,
+  julij: 7, julija: 7, avgust: 8, avgusta: 8, september: 9, septembra: 9,
+  oktober: 10, oktobra: 10, november: 11, novembra: 11, december: 12, decembra: 12,
+};
+
+type FetchPageResult = {
+  html: string;
+  status: number;
+  finalUrl: string;
+  elapsedMs: number;
+  contentType: string | null;
+  server: string | null;
+  cfRay: string | null;
+  cfCacheStatus: string | null;
+};
+
+type DiscoveryDiagnostic = {
+  label: string;
+  requested_url: string;
+  status: number;
+  final_url: string;
+  elapsed_ms: number;
+  content_type: string | null;
+  server: string | null;
+  cf_ray: string | null;
+  cf_cache_status: string | null;
+  html_bytes: number;
+  title: string | null;
+  all_links: number;
+  event_links: number;
+  body_text_chars: number;
+  suspicious_html_sample?: string;
 };
 
 function clean(value: string | null | undefined) {
   return (value ?? "").replace(/\s+/g, " ").trim();
 }
 
-async function fetchHtml(url: string) {
+async function fetchPage(url: string): Promise<FetchPageResult> {
+  const startedAt = Date.now();
   const response = await fetch(url, {
     headers: {
       "user-agent": USER_AGENT,
@@ -60,14 +70,28 @@ async function fetchHtml(url: string) {
     },
     redirect: "follow",
   });
+  const elapsedMs = Date.now() - startedAt;
+  const html = await response.text();
 
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
-
-  const html = await response.text();
   if (/request is being verified|just a moment|cloudflare/i.test(html) && html.length < 30000) {
     throw new Error(`Anti-bot page returned for ${url}`);
   }
-  return html;
+
+  return {
+    html,
+    status: response.status,
+    finalUrl: response.url,
+    elapsedMs,
+    contentType: response.headers.get("content-type"),
+    server: response.headers.get("server"),
+    cfRay: response.headers.get("cf-ray"),
+    cfCacheStatus: response.headers.get("cf-cache-status"),
+  };
+}
+
+async function fetchHtml(url: string) {
+  return (await fetchPage(url)).html;
 }
 
 function eventUrlFromHref(href: string | undefined) {
@@ -83,10 +107,41 @@ function eventUrlFromHref(href: string | undefined) {
   }
 }
 
+function diagnosticForPage(label: string, requestedUrl: string, page: FetchPageResult): DiscoveryDiagnostic {
+  const $ = load(page.html);
+  const allLinks = $("a[href]").length;
+  let eventLinks = 0;
+  $("a[href]").each((_index, element) => {
+    if (eventUrlFromHref($(element).attr("href"))) eventLinks += 1;
+  });
+
+  const bodyText = clean($("body").text());
+  const result: DiscoveryDiagnostic = {
+    label,
+    requested_url: requestedUrl,
+    status: page.status,
+    final_url: page.finalUrl,
+    elapsed_ms: page.elapsedMs,
+    content_type: page.contentType,
+    server: page.server,
+    cf_ray: page.cfRay,
+    cf_cache_status: page.cfCacheStatus,
+    html_bytes: new TextEncoder().encode(page.html).length,
+    title: clean($("title").first().text()) || null,
+    all_links: allLinks,
+    event_links: eventLinks,
+    body_text_chars: bodyText.length,
+  };
+
+  if (eventLinks === 0) {
+    result.suspicious_html_sample = clean(page.html.slice(0, 800));
+  }
+  return result;
+}
+
 function leafTextAfterLabel($: ReturnType<typeof load>, wantedLabel: string) {
   const wanted = wantedLabel.toLocaleUpperCase("sl-SI");
   const elements = $("body *").toArray();
-
   for (let i = 0; i < elements.length; i += 1) {
     const element = elements[i];
     const text = clean($(element).text()).toLocaleUpperCase("sl-SI");
@@ -102,15 +157,12 @@ function leafTextAfterLabel($: ReturnType<typeof load>, wantedLabel: string) {
       }
     }
   }
-
   return null;
 }
 
 function parseSlovenianDate(value: string | null) {
   if (!value) return null;
-  const match = clean(value)
-    .toLocaleLowerCase("sl-SI")
-    .match(/(\d{1,2})\.\s*([a-zčšž]+)\s+(\d{4})/i);
+  const match = clean(value).toLocaleLowerCase("sl-SI").match(/(\d{1,2})\.\s*([a-zčšž]+)\s+(\d{4})/i);
   if (!match) return null;
   const month = MONTHS[match[2]];
   if (!month) return null;
@@ -119,37 +171,18 @@ function parseSlovenianDate(value: string | null) {
 
 function timeZoneOffsetMs(timestamp: number) {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
+    timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
   }).formatToParts(new Date(timestamp));
-
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const asUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-    Number(values.hour),
-    Number(values.minute),
-    Number(values.second),
-  );
+  const asUtc = Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day), Number(values.hour), Number(values.minute), Number(values.second));
   return asUtc - timestamp;
 }
 
-function localDateTimeToIso(
-  date: { year: number; month: number; day: number },
-  time: string | null,
-) {
+function localDateTimeToIso(date: { year: number; month: number; day: number }, time: string | null) {
   const match = (time ?? "00:00").match(/(\d{1,2}):(\d{2})/);
   if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  const wallClock = Date.UTC(date.year, date.month - 1, date.day, hour, minute, 0);
+  const wallClock = Date.UTC(date.year, date.month - 1, date.day, Number(match[1]), Number(match[2]), 0);
   let offset = timeZoneOffsetMs(wallClock);
   let utc = wallClock - offset;
   offset = timeZoneOffsetMs(utc);
@@ -161,9 +194,7 @@ function priceFromBody(bodyText: string) {
   const marker = bodyText.search(/Cena vstopnic:/i);
   if (marker === -1) return null;
   const tail = bodyText.slice(marker).replace(/^.*?Cena vstopnic:\s*/i, "");
-  const value = tail.split(
-    /Predprodaja vstopnic:|Spletna prodaja:|📍|Lokacija:|Število ogledov|Želite opomnik|document\.addEventListener|🏪|🛒/i,
-  )[0];
+  const value = tail.split(/Predprodaja vstopnic:|Spletna prodaja:|📍|Lokacija:|Število ogledov|Želite opomnik|document\.addEventListener|🏪|🛒/i)[0];
   return clean(value) || null;
 }
 
@@ -184,7 +215,6 @@ async function parseDetail(url: string, category: string) {
   const timeText = leafTextAfterLabel($, "URA DOGODKA");
   const venue = leafTextAfterLabel($, "LOKACIJA");
   const date = parseSlovenianDate(dateText);
-
   if (!title || !date) throw new Error(`Could not parse title/date for ${url}`);
 
   const startAt = localDateTimeToIso(date, timeText);
@@ -192,24 +222,16 @@ async function parseDetail(url: string, category: string) {
 
   const bodyText = clean($("body").text());
   const priceText = priceFromBody(bodyText);
-  const imageUrl =
-    $("meta[property='og:image']").attr("content") ||
-    $("meta[name='twitter:image']").attr("content") ||
-    null;
+  const imageUrl = $("meta[property='og:image']").attr("content") || $("meta[name='twitter:image']").attr("content") || null;
   const slug = new URL(url).pathname.split("/").filter(Boolean).pop()!;
-
   let isFree: boolean | null = null;
-  if (priceText) {
-    isFree = /brezpla|vstop\s+prost|prost\s+vstop|^0(?:[,.]0+)?\s*€?$/i.test(priceText);
-  }
+  if (priceText) isFree = /brezpla|vstop\s+prost|prost\s+vstop|^0(?:[,.]0+)?\s*€?$/i.test(priceText);
 
   return {
     source_event_id: slug,
     title,
     slug,
     start_at: startAt,
-    // cele.si currently exposes only the start date. Do not write end_at here:
-    // a second source may have enriched an existing row with a verified date range.
     all_day: false,
     venue,
     address: addressFromBody(bodyText, venue),
@@ -228,45 +250,33 @@ async function parseDetail(url: string, category: string) {
 async function mapBatches<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>) {
   const results: R[] = [];
   for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    results.push(...(await Promise.all(batch.map(fn))));
+    results.push(...(await Promise.all(items.slice(i, i + batchSize).map(fn))));
   }
   return results;
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, serviceRole, {
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: source, error: sourceError } = await supabase
-    .from("sources")
-    .select("id,last_synced_at")
-    .eq("key", "cele-si")
-    .single();
-
-  if (sourceError || !source) {
-    return Response.json({ ok: false, error: sourceError?.message ?? "Source missing" }, { status: 500 });
-  }
-
-  if (source.last_synced_at) {
-    const ageMs = Date.now() - new Date(source.last_synced_at).getTime();
-    if (ageMs < 20 * 60 * 1000) {
-      return Response.json({ ok: true, skipped: true, reason: "recently_synced" });
-    }
+  const { data: source, error: sourceError } = await supabase.from("sources").select("id,last_synced_at").eq("key", "cele-si").single();
+  if (sourceError || !source) return Response.json({ ok: false, error: sourceError?.message ?? "Source missing" }, { status: 500 });
+  if (source.last_synced_at && Date.now() - new Date(source.last_synced_at).getTime() < 20 * 60 * 1000) {
+    return Response.json({ ok: true, skipped: true, reason: "recently_synced" });
   }
 
   const discovered = new Map<string, string>();
   const warnings: string[] = [];
+  const diagnostics: DiscoveryDiagnostic[] = [];
 
   for (const [category, slug] of CATEGORIES) {
+    const url = `${BASE_URL}/kategorija-dogodka/${slug}/`;
     try {
-      const html = await fetchHtml(`${BASE_URL}/kategorija-dogodka/${slug}/`);
-      const $ = load(html);
+      const page = await fetchPage(url);
+      const $ = load(page.html);
+      diagnostics.push(diagnosticForPage(category, url, page));
       $("a[href]").each((_index, element) => {
         const eventUrl = eventUrlFromHref($(element).attr("href"));
         if (eventUrl && !discovered.has(eventUrl)) discovered.set(eventUrl, category);
@@ -276,9 +286,11 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  const archiveUrl = `${BASE_URL}/dogodek/`;
   try {
-    const html = await fetchHtml(`${BASE_URL}/dogodek/`);
-    const $ = load(html);
+    const page = await fetchPage(archiveUrl);
+    const $ = load(page.html);
+    diagnostics.push(diagnosticForPage("Archive", archiveUrl, page));
     $("a[href]").each((_index, element) => {
       const eventUrl = eventUrlFromHref($(element).attr("href"));
       if (eventUrl && !discovered.has(eventUrl)) discovered.set(eventUrl, "Ostalo");
@@ -288,49 +300,39 @@ Deno.serve(async (req: Request) => {
   }
 
   if (discovered.size === 0) {
-    return Response.json({ ok: false, error: "No event URLs discovered", warnings }, { status: 502 });
+    console.error("cele.si discovery returned zero event URLs", JSON.stringify({ warnings, diagnostics }));
+    return Response.json({ ok: false, error: "No event URLs discovered", warnings, diagnostics }, { status: 502 });
   }
 
   const failures: string[] = [];
   const parsed = await mapBatches([...discovered.entries()], 6, async ([url, category]) => {
-    try {
-      return await parseDetail(url, category);
-    } catch (error) {
-      failures.push(`${url}: ${error instanceof Error ? error.message : String(error)}`);
-      return null;
-    }
+    try { return await parseDetail(url, category); }
+    catch (error) { failures.push(`${url}: ${error instanceof Error ? error.message : String(error)}`); return null; }
   });
 
   const nowIso = new Date().toISOString();
-  const rows = parsed
-    .filter((event): event is NonNullable<typeof event> => Boolean(event))
-    .map((event) => ({
-      ...event,
-      source_id: source.id,
-      last_seen_at: nowIso,
-      updated_at: nowIso,
-    }));
+  const rows = parsed.filter((event): event is NonNullable<typeof event> => Boolean(event)).map((event) => ({
+    ...event,
+    source_id: source.id,
+    last_seen_at: nowIso,
+    updated_at: nowIso,
+  }));
 
   for (let i = 0; i < rows.length; i += 100) {
-    const { error } = await supabase
-      .from("events")
-      .upsert(rows.slice(i, i + 100), { onConflict: "source_id,source_event_id" });
-    if (error) {
-      return Response.json({ ok: false, error: error.message, discovered: discovered.size, parsed: rows.length }, { status: 500 });
-    }
+    const { error } = await supabase.from("events").upsert(rows.slice(i, i + 100), { onConflict: "source_id,source_event_id" });
+    if (error) return Response.json({ ok: false, error: error.message, discovered: discovered.size, parsed: rows.length }, { status: 500 });
   }
 
-  await supabase
-    .from("sources")
-    .update({ last_synced_at: nowIso, updated_at: nowIso })
-    .eq("id", source.id);
-
+  await supabase.from("sources").update({ last_synced_at: nowIso, updated_at: nowIso }).eq("id", source.id);
   return Response.json({
     ok: true,
     discovered: discovered.size,
     imported: rows.length,
     failed: failures.length,
     warnings,
+    discovery_summary: diagnostics.map(({ label, status, elapsed_ms, html_bytes, title, all_links, event_links, server, cf_ray, cf_cache_status }) => ({
+      label, status, elapsed_ms, html_bytes, title, all_links, event_links, server, cf_ray, cf_cache_status,
+    })),
     failures: failures.slice(0, 10),
   });
 });
