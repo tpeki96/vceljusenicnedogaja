@@ -7,10 +7,10 @@ Ideja: vzeti lokalni rek »V Celju se nič ne dogaja« dobesedno in ga soočiti 
 ## Trenutni stack
 
 - Next.js na Vercelu
-- Supabase/Postgres za normalizirane dogodke
-- Supabase Edge Functions `sync-cele`, `sync-celje-info` in `sync-visit-celje`
-- podatkovni viri **V Celu dogaja (cele.si)**, **Celje.info** in **Visit Celje**
-- avtomatski sync vseh virov vsakih 6 ur prek `pg_cron` + `pg_net`
+- Supabase/Postgres za normalizirane dogodke in vire
+- Supabase Edge Functions za avtomatski uvoz dogodkov
+- `pg_cron` + `pg_net` za periodično osveževanje
+- javni koledarji organizatorjev, prizorišč in lokalni informacijski viri
 
 ## Podatkovni tok
 
@@ -22,21 +22,74 @@ Dogodki so razvrščeni kot:
 
 - `single` – enkratni dogodek
 - `multiday` – večdnevni dogodek; šteje v dnevni prikaz vsak dan, ko dejansko poteka
-- `ongoing` – dalj časa trajajoča razstava/program; na strani je prikazan ločeno pod **V teku** in ne napihuje glavnega dnevnega števca
+- `ongoing` – dalj časa trajajoča razstava ali program; na strani je prikazan ločeno pod **V teku** in ne napihuje glavnega dnevnega števca
 
-Frontend prikazuje samo objavljene dogodke v območju Celja in izloči zapise, označene kot duplikati. Importerji primerjajo naslov, lokacijo in časovno prekrivanje z že obstoječimi dogodki. Podprti so tudi primeri, ko en vir objavi celoten večdnevni dogodek, drugi pa vsak dan posebej.
+Frontend prikazuje samo objavljene dogodke v območju Celja in izloči zapise, označene kot duplikati.
 
-Visit Celje ima večji katalog, zato je njegov importer namerno inkrementalen in rate-aware: novi dogodki imajo prednost, obstoječi pa se osvežujejo po rotaciji v manjših batchih. Tako ostajamo znotraj runtime omejitev in zmanjšamo obremenitev izvorne strani.
+## Deduplikacija
+
+Pri istem dogodku uporabljamo prioriteto:
+
+`neposredni vir organizatorja/prizorišča → lokalni koledar/agregator`
+
+Primerjamo predvsem:
+
+- datum in uro
+- naslov dogodka
+- lokacijo oziroma prizorišče
+- časovno prekrivanje pri večdnevnih dogodkih
+
+Če je isti dogodek objavljen na več mestih, naj bo kanonični zapis praviloma neposredni vir organizatorja.
 
 ## Trenutni viri
 
-1. `cele.si` / V Celu dogaja
-2. `celje.info/kam-v-celju/`
-3. `visitcelje.eu` / Visit Celje
+### Lokalni koledarji in agregatorji
+
+- Visit Celje
+- Celje.info
+
+### Neposredni in uradni viri
+
+Med aktivnimi neposrednimi viri so trenutno med drugim:
+
+- Celjski mladinski center
+- Muzej novejše zgodovine Celje
+- Tehnopark Celje
+- Slovensko ljudsko gledališče Celje
+- Celjski sejem
+- Citycenter Celje
+- Inkubator Savinjske regije
+- Špital za prjatle
+- Mansion Klub
+- Plesni forum Celje
+- NK Celje
+- RK Celje Pivovarna Laško
+- Košarkarski klub Celje
+- Atletska zveza Slovenije
+- Rokometna zveza Slovenije
+
+Aktualni seznam aktivnih virov je na strani `/viri` in se bere neposredno iz baze.
+
+## Osveževanje
+
+Večina virov se samodejno osveži na približno 6 ur. Posamezni importerji so časovno zamaknjeni, da ne obremenijo sistema hkrati.
+
+Visit Celje ima večji katalog, zato je njegov importer inkrementalen in rate-aware: novi dogodki imajo prednost, obstoječi pa se osvežujejo po rotaciji v manjših batchih.
+
+## Varnost in način vnosa
+
+Javni uporabniki nimajo možnosti pisanja v bazo. RLS dovoljuje javno samo branje objavljenih dogodkov, aktivnih virov in prevodov.
+
+Trenutno ni javnega obrazca za dodajanje dogodkov. Manjkajoče dogodke se po potrebi lahko doda interno.
+
+## Opomba o virih
+
+Portal uporablja javno objavljene podatke organizatorjev in drugih neodvisnih virov. Nekdanji vir `cele.si / V Celu dogaja` ni več v uporabi; avtomatsko pridobivanje z njega je izključeno in njegovi dogodki so bili odstranjeni iz baze.
 
 ## Naslednje
 
-- nadaljnje izboljšave deduplikacije in lokacijskega filtra
-- lasten obrazec za manjkajoče dogodke
-- statistika in mesečni pregled mita »nič se ne dogaja«
-- po potrebi dodatni neposredni viri organizatorjev
+- nadaljnje dodajanje kakovostnih neposrednih virov
+- izboljšave deduplikacije in lokacijskega filtra
+- postopno čiščenje podatkovnih anomalij
+- spremljanje zdravja importerjev in kakovosti podatkov
+- nadaljnji razvoj statistike o dogajanju v Celju
