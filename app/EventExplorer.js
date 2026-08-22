@@ -10,26 +10,42 @@ const SOURCE_COPY = {
   de: { description: "öffentliche Veranstaltungskalender von Veranstaltern und lokale Quellen", link: "Quellen und Datenerfassung" },
   it: { description: "calendari pubblici degli organizzatori e fonti locali", link: "Fonti e metodo di raccolta" },
 };
+const ALL_DAY_COPY = { sl: "VES DAN", en: "ALL DAY", de: "GANZTÄGIG", it: "TUTTO IL GIORNO" };
 
-function EventCard({ event, copy }) {
+function displayText(value) {
+  return String(value || "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&#x27;", "'")
+    .replaceAll("&nbsp;", " ");
+}
+
+function EventCard({ event, copy, lang }) {
+  const shownTime = event.eventType === "single" && event.time === "00:00"
+    ? (ALL_DAY_COPY[lang] || ALL_DAY_COPY.sl)
+    : event.time;
+  const shownTitle = displayText(event.title);
+  const shownVenue = displayText(event.venue);
+
   return (
     <a
       className="event-card"
       href={event.url}
       target="_blank"
       rel="noreferrer"
-      aria-label={`${event.title} – ${copy.openOriginal}`}
+      aria-label={`${shownTitle} – ${copy.openOriginal}`}
     >
-      <div className="event-time">{event.time}</div>
+      <div className="event-time">{shownTime}</div>
       <div className="event-main">
-        <h3>{event.title}</h3>
-        <p>{event.venue}</p>
+        <h3>{shownTitle}</h3>
+        <p>{shownVenue}</p>
         <div className="tags">
-          <span>{event.category}</span>
+          <span>{displayText(event.category)}</span>
           {event.eventType === "multiday" && <span>{copy.multiDay}</span>}
           {event.duration && <span>{event.duration}</span>}
           {event.free && <span className="free">{copy.free}</span>}
-          {!event.free && event.price && <span>{event.price}</span>}
+          {!event.free && event.price && <span>{displayText(event.price)}</span>}
         </div>
       </div>
       <div className="event-arrow" aria-hidden="true">
@@ -86,7 +102,7 @@ export default function EventExplorer({ periods, lang = "sl" }) {
           <>
             <div className="event-list">
               {visibleEvents.map((event) => (
-                <EventCard key={event.id} event={event} copy={copy} />
+                <EventCard key={event.id} event={event} copy={copy} lang={lang} />
               ))}
             </div>
 
