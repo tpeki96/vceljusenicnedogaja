@@ -4,6 +4,12 @@ import { useMemo, useState } from "react";
 import { getCopy } from "../lib/i18n";
 
 const INITIAL_LIMIT = 8;
+const SOURCE_COPY = {
+  sl: { description: "javno objavljeni koledarji organizatorjev in lokalni viri", link: "Viri in način zbiranja" },
+  en: { description: "public event calendars from organisers and local sources", link: "Sources and collection method" },
+  de: { description: "öffentliche Veranstaltungskalender von Veranstaltern und lokale Quellen", link: "Quellen und Datenerfassung" },
+  it: { description: "calendari pubblici degli organizzatori e fonti locali", link: "Fonti e metodo di raccolta" },
+};
 
 function EventCard({ event, copy }) {
   return (
@@ -37,6 +43,8 @@ function EventCard({ event, copy }) {
 
 export default function EventExplorer({ periods, lang = "sl" }) {
   const copy = getCopy(lang).events;
+  const sourceCopy = SOURCE_COPY[lang] || SOURCE_COPY.sl;
+  const sourcesHref = lang === "sl" ? "/viri" : `/${lang}/viri`;
   const [activeKey, setActiveKey] = useState("today");
   const [expanded, setExpanded] = useState(false);
   const active = periods[activeKey];
@@ -100,9 +108,8 @@ export default function EventExplorer({ periods, lang = "sl" }) {
         )}
 
         <p className="data-status">
-          {copy.dataPrefix} <a href="https://www.cele.si" target="_blank" rel="noreferrer">V Celu dogaja</a>
-          {" + "}<a href="https://www.celje.info/kam-v-celju/" target="_blank" rel="noreferrer">Celje.info</a>
-          {" + "}<a href="https://www.visitcelje.eu/sl/kategorija-izdelka/kaj-poceti/dogodki/" target="_blank" rel="noreferrer">Visit Celje</a>
+          {copy.dataPrefix} {sourceCopy.description}
+          {" · "}<a href={sourcesHref}>{sourceCopy.link}</a>
           {" · "}{copy.dataSuffix}
         </p>
       </div>
