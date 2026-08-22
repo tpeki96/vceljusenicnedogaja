@@ -1,3 +1,5 @@
+import styles from "./SourcesPage.module.css";
+
 const SUPABASE_URL = "https://awyberrgkaaawxfgquvd.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_49txmxFiwCggw-XyTFlssA_BthU47_o";
 
@@ -88,11 +90,11 @@ function formatSynced(value, lang) {
 
 function SourceList({ sources, lang, copy }) {
   return (
-    <div className="source-list">
+    <div className={styles.list}>
       {sources.map((source) => {
         const synced = formatSynced(source.last_synced_at, lang);
         return (
-          <a className="source-card" href={source.base_url} target="_blank" rel="noreferrer" key={source.key}>
+          <a className={styles.card} href={source.base_url} target="_blank" rel="noreferrer" key={source.key}>
             <div>
               <strong>{source.name}</strong>
               <span>{synced ? `${copy.updated}: ${synced}` : copy.never}</span>
@@ -116,33 +118,33 @@ export default async function SourcesPage({ lang = "sl" }) {
     <main lang={lang}>
       <header className="site-header wrap">
         <a className="brand" href={home}>V CELJU SE NIČ NE DOGAJA.</a>
-        <a className="sources-back" href={home}>{copy.back}</a>
+        <a className={styles.back} href={home}>{copy.back}</a>
       </header>
 
-      <section className="sources-page wrap">
-        <div className="sources-hero">
+      <section className={`${styles.page} wrap`}>
+        <div className={styles.hero}>
           <p className="eyebrow">{copy.eyebrow}</p>
           <h1>{copy.title}</h1>
           <p>{copy.intro}</p>
         </div>
 
-        <section className="sources-section">
-          <div className="sources-section-head">
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
             <h2>{copy.direct}</h2>
             <p>{copy.directHint}</p>
           </div>
           <SourceList sources={direct} lang={lang} copy={copy} />
         </section>
 
-        <section className="sources-section">
-          <div className="sources-section-head">
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
             <h2>{copy.other}</h2>
             <p>{copy.otherHint}</p>
           </div>
           <SourceList sources={other} lang={lang} copy={copy} />
         </section>
 
-        <p className="sources-note">{copy.note}</p>
+        <p className={styles.note}>{copy.note}</p>
       </section>
 
       <footer>
