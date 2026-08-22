@@ -4,6 +4,13 @@ import { getCopy, LANGUAGE_PATHS, LOCALES, SUPPORTED_LANGUAGES } from "../lib/i1
 
 export const revalidate = 300;
 
+const STATS_SOURCE_NOTE = {
+  sl: "Statistika temelji na javno objavljenih koledarjih organizatorjev in lokalnih virih. Ne predstavlja uradne ali popolne evidence vseh dogodkov v Celju.",
+  en: "Statistics are based on publicly available event calendars from organisers and local sources. They are not an official or complete record of every event in Celje.",
+  de: "Die Statistik basiert auf öffentlich verfügbaren Veranstaltungskalendern von Veranstaltern und lokalen Quellen. Sie ist keine offizielle oder vollständige Erfassung aller Veranstaltungen in Celje.",
+  it: "Le statistiche si basano sui calendari pubblici degli organizzatori e su fonti locali. Non costituiscono un registro ufficiale o completo di tutti gli eventi a Celje.",
+};
+
 function currentCeljeDate(lang) {
   const locale = LOCALES[lang] || LOCALES.sl;
   return new Intl.DateTimeFormat(locale, {
@@ -110,7 +117,7 @@ export default async function LocalizedHome({ lang = "sl" }) {
             {stats.ongoingCount > 0 && <> {copy.stats.ongoing(stats.ongoingCount)}</>}
           </div>
 
-          <p className="stats-note">{copy.stats.note}</p>
+          <p className="stats-note">{STATS_SOURCE_NOTE[lang] || STATS_SOURCE_NOTE.sl}</p>
         </div>
       </section>
 
