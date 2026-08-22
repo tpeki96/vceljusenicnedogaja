@@ -1,0 +1,158 @@
+.back {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.page {
+  min-height: calc(100vh - 198px);
+  padding: 92px 0 120px;
+}
+
+.hero {
+  max-width: 940px;
+  margin-bottom: 84px;
+}
+
+.hero h1 {
+  margin: 0;
+  max-width: 900px;
+  font-size: clamp(54px, 8vw, 108px);
+  line-height: 0.9;
+  letter-spacing: -0.07em;
+}
+
+.hero > p:last-child {
+  max-width: 720px;
+  margin: 42px 0 0;
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.section {
+  margin-top: 72px;
+}
+
+.sectionHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  gap: 50px;
+  align-items: end;
+  margin-bottom: 28px;
+}
+
+.sectionHead h2 {
+  margin: 0;
+  font-size: clamp(32px, 4.5vw, 58px);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.sectionHead p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--ink);
+}
+
+.card {
+  min-height: 108px;
+  padding: 22px 24px 22px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  transition: padding 150ms ease, background 150ms ease;
+}
+
+.card:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+
+.card:nth-child(even) {
+  padding-left: 24px;
+}
+
+.card:hover {
+  background: rgba(17,17,17,.035);
+}
+
+.card strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 19px;
+  letter-spacing: -0.025em;
+}
+
+.card span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.card b {
+  flex: 0 0 auto;
+  font-size: 23px;
+  font-weight: 500;
+}
+
+.note {
+  margin: 52px 0 0;
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .back {
+    max-width: 140px;
+    text-align: right;
+    font-size: 11px;
+  }
+
+  .page {
+    padding: 70px 0 90px;
+  }
+
+  .hero {
+    margin-bottom: 64px;
+  }
+
+  .hero > p:last-child {
+    margin-top: 30px;
+    font-size: 16px;
+  }
+
+  .section {
+    margin-top: 58px;
+  }
+
+  .sectionHead {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .list {
+    grid-template-columns: 1fr;
+  }
+
+  .card,
+  .card:nth-child(even) {
+    padding: 20px 0;
+    border-right: 0;
+  }
+}
