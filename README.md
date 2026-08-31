@@ -30,7 +30,7 @@ Frontend prikazuje samo objavljene dogodke v območju Celja in izloči zapise, o
 
 Pri istem dogodku uporabljamo prioriteto:
 
-`neposredni vir organizatorja/prizorišča → lokalni koledar/agregator`
+`neposredni vir organizatorja/prizorišča → uradni panožni vir → lokalni koledar/agregator`
 
 Primerjamo predvsem:
 
@@ -39,7 +39,7 @@ Primerjamo predvsem:
 - lokacijo oziroma prizorišče
 - časovno prekrivanje pri večdnevnih dogodkih
 
-Če je isti dogodek objavljen na več mestih, naj bo kanonični zapis praviloma neposredni vir organizatorja.
+Če je isti dogodek objavljen na več mestih, naj bo kanonični zapis praviloma neposredni ali uradni vir.
 
 ## Trenutni viri
 
@@ -65,6 +65,9 @@ Med aktivnimi neposrednimi viri so trenutno med drugim:
 - NK Celje
 - RK Celje Pivovarna Laško
 - Košarkarski klub Celje
+- ŽKK Cinkarna Celje
+- Hokejska zveza Slovenije (domače tekme HK LedX Celje)
+- Športna zveza Celje
 - Atletska zveza Slovenije
 - Rokometna zveza Slovenije
 
@@ -75,6 +78,8 @@ Aktualni seznam aktivnih virov je na strani `/viri` in se bere neposredno iz baz
 Večina virov se samodejno osveži na približno 6 ur. Posamezni importerji so časovno zamaknjeni, da ne obremenijo sistema hkrati.
 
 Visit Celje ima večji katalog, zato je njegov importer inkrementalen in rate-aware: novi dogodki imajo prednost, obstoječi pa se osvežujejo po rotaciji v manjših batchih.
+
+Športne tekme se po možnosti pridobivajo iz neposrednih klubskih koledarjev ali uradnih panožnih zvez, pri čemer se uvažajo samo dogodki v Celju.
 
 ## Varnost in način vnosa
 
@@ -88,7 +93,7 @@ Portal uporablja javno objavljene podatke organizatorjev in drugih neodvisnih vi
 
 ## Naslednje
 
-- nadaljnje dodajanje kakovostnih neposrednih virov
+- nadaljnje dodajanje kakovostnih neposrednih virov, posebej športnih
 - izboljšave deduplikacije in lokacijskega filtra
 - postopno čiščenje podatkovnih anomalij
 - spremljanje zdravja importerjev in kakovosti podatkov
