@@ -11,6 +11,12 @@ const SOURCE_COPY = {
   it: { description: "calendari pubblici degli organizzatori e fonti locali", link: "Fonti e metodo di raccolta" },
 };
 const ALL_DAY_COPY = { sl: "VES DAN", en: "ALL DAY", de: "GANZTÄGIG", it: "TUTTO IL GIORNO" };
+const MORE_COPY = {
+  sl: { more: (count) => `Še ${count} dogodkov`, show: "Prikaži vse", less: "Prikaži manj" },
+  en: { more: (count) => `${count} more events`, show: "Show all", less: "Show less" },
+  de: { more: (count) => `Noch ${count} Veranstaltungen`, show: "Alle anzeigen", less: "Weniger anzeigen" },
+  it: { more: (count) => `Altri ${count} eventi`, show: "Mostra tutti", less: "Mostra meno" },
+};
 
 function displayText(value) {
   return String(value || "")
@@ -60,10 +66,12 @@ function EventCard({ event, copy, lang }) {
 export default function EventExplorer({ periods, lang = "sl" }) {
   const copy = getCopy(lang).events;
   const sourceCopy = SOURCE_COPY[lang] || SOURCE_COPY.sl;
+  const moreCopy = MORE_COPY[lang] || MORE_COPY.sl;
   const sourcesHref = lang === "sl" ? "/viri" : `/${lang}/viri`;
   const [activeKey, setActiveKey] = useState("today");
   const [expanded, setExpanded] = useState(false);
   const active = periods[activeKey];
+  const remainingCount = Math.max(0, active.events.length - INITIAL_LIMIT);
 
   const visibleEvents = useMemo(
     () => (expanded ? active.events : active.events.slice(0, INITIAL_LIMIT)),
@@ -107,13 +115,20 @@ export default function EventExplorer({ periods, lang = "sl" }) {
             </div>
 
             {active.events.length > INITIAL_LIMIT && (
-              <button
-                className="all-events"
-                type="button"
-                onClick={() => setExpanded((value) => !value)}
-              >
-                {expanded ? copy.showLess : copy.showAll(active.count)}
-              </button>
+              <div className={`more-events-wrap${expanded ? " expanded" : ""}`}>
+                <button
+                  className="all-events"
+                  type="button"
+                  aria-expanded={expanded}
+                  onClick={() => setExpanded((value) => !value)}
+                >
+                  {!expanded && <span className="all-events-count">{moreCopy.more(remainingCount)}</span>}
+                  <span className="all-events-action">
+                    {expanded ? moreCopy.less : moreCopy.show}
+                    <span className="all-events-arrow" aria-hidden="true">{expanded ? "↑" : "↓"}</span>
+                  </span>
+                </button>
+              </div>
             )}
           </>
         ) : (
