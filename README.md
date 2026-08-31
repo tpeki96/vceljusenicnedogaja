@@ -70,6 +70,8 @@ Med aktivnimi neposrednimi viri so trenutno med drugim:
 - Športna zveza Celje
 - Atletska zveza Slovenije
 - Rokometna zveza Slovenije
+- Kajakaška zveza Slovenije
+- Plavalna zveza Slovenije
 
 Aktualni seznam aktivnih virov je na strani `/viri` in se bere neposredno iz baze.
 
@@ -89,7 +91,7 @@ Trenutno ni javnega obrazca za dodajanje dogodkov. Manjkajoče dogodke se po pot
 
 ## Opomba o virih
 
-Portal uporablja javno objavljene podatke organizatorjev in drugih neodvisnih virov. Nekdanji vir `cele.si / V Celu dogaja` ni več v uporabi; avtomatsko pridobivanje z njega je izključeno in njegovi dogodki so bili odstranjeni iz baze.
+Portal uporablja javno objavljene podatke organizatorjev, prizorišč, uradnih panožnih zvez in drugih neodvisnih javnih virov. Aktualni seznam aktivnih virov je vedno objavljen na strani `/viri`.
 
 ## Naslednje
 
