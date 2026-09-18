@@ -1,4 +1,5 @@
 import EventExplorer from "./EventExplorer";
+import SeoSchema from "./SeoSchema";
 import { buildPeriods, buildStats, fetchUpcomingEvents } from "../lib/events";
 import { getCopy, LANGUAGE_PATHS, LOCALES, SUPPORTED_LANGUAGES } from "../lib/i18n";
 
@@ -32,7 +33,9 @@ export default async function LocalizedHome({ lang = "sl" }) {
   const todayCount = periods.today.count;
 
   return (
-    <main lang={lang}>
+    <>
+      <SeoSchema lang={lang} />
+      <main lang={lang}>
       <header className="site-header wrap">
         <a className="brand" href="#top" aria-label={copy.brand}>
           {copy.brand}
@@ -139,6 +142,7 @@ export default async function LocalizedHome({ lang = "sl" }) {
           <span>{copy.footer}</span>
         </div>
       </footer>
-    </main>
+      </main>
+    </>
   );
 }
