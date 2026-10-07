@@ -43,6 +43,7 @@ async function fetchHtml(url: string, attempts = 3) {
           "accept-language": "sl-SI,sl;q=0.9,en;q=0.6",
         },
         redirect: "follow",
+        signal: AbortSignal.timeout(20000),
       });
 
       if (response.status === 429) {
@@ -79,17 +80,17 @@ async function mapBatches<T, R>(
   return output;
 }
 
+const offsetFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+});
+const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+});
+const dateCache = new Map<string, string>();
+
 function timeZoneOffsetMs(timestamp: number) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(timestamp));
+  const parts = offsetFormatter.formatToParts(new Date(timestamp));
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return Date.UTC(
     Number(values.year),
@@ -116,14 +117,15 @@ function localDateTimeToIso(
 }
 
 function dateKey(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
+  const iso = date.toISOString();
+  const cached = dateCache.get(iso);
+  if (cached) return cached;
+  const parts = dateFormatter.formatToParts(date);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  const key = `${values.year}-${values.month}-${values.day}`;
+  if (dateCache.size >= 5000) dateCache.clear();
+  dateCache.set(iso, key);
+  return key;
 }
 
 function isoDateKey(iso: string | null) {

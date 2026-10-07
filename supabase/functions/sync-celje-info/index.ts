@@ -28,6 +28,7 @@ async function fetchHtml(url: string) {
       "accept-language": "sl-SI,sl;q=0.9,en;q=0.6",
     },
     redirect: "follow",
+    signal: AbortSignal.timeout(20000),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
   const html = await response.text();
@@ -71,11 +72,17 @@ function eventContent($: ReturnType<typeof load>) {
   return clean(content);
 }
 
+const offsetFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+});
+const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+});
+const dateCache = new Map<string, string>();
+
 function timeZoneOffsetMs(timestamp: number) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
-  }).formatToParts(new Date(timestamp));
+  const parts = offsetFormatter.formatToParts(new Date(timestamp));
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   const asUtc = Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day), Number(values.hour), Number(values.minute), Number(values.second));
   return asUtc - timestamp;
@@ -176,11 +183,14 @@ function textSimilarity(a: string | null, b: string | null) {
 
 function celjeDateKey(iso: string | null) {
   if (!iso) return null;
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(new Date(iso));
+  const cached = dateCache.get(iso);
+  if (cached) return cached;
+  const parts = dateFormatter.formatToParts(new Date(iso));
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  const key = `${values.year}-${values.month}-${values.day}`;
+  if (dateCache.size >= 5000) dateCache.clear();
+  dateCache.set(iso, key);
+  return key;
 }
 
 function rangesOverlap(aStart: string, aEnd: string | null, bStart: string, bEnd: string | null) {
@@ -277,12 +287,28 @@ Deno.serve(async (req: Request) => {
     ...event, source_id: source.id, last_seen_at: nowIso, updated_at: nowIso,
   }));
 
+  if (!rows.length) return Response.json({ ok: false, error: "No events parsed", failures: failures.slice(0, 10) }, { status: 502 });
+  const { data: known, error: knownError } = await supabase.from("events")
+    .select("source_event_id,title,start_at,venue,duplicate_of,dedupe_confidence,dedupe_reason")
+    .eq("source_id", source.id).in("source_event_id", rows.map(row => row.source_event_id));
+  if (knownError) return Response.json({ ok: false, error: knownError.message }, { status: 500 });
+  for (const row of rows) {
+    const previous = (known ?? []).find(event => event.source_event_id === row.source_event_id);
+    if (previous?.duplicate_of && previous.dedupe_reason?.startsWith("reviewed:")
+        && previous.title === row.title && previous.venue === row.venue
+        && Date.parse(previous.start_at) === Date.parse(row.start_at)) {
+      row.duplicate_of = previous.duplicate_of;
+      row.dedupe_confidence = previous.dedupe_confidence;
+      row.dedupe_reason = previous.dedupe_reason;
+    }
+  }
+
   const { data: imported, error: upsertError } = await supabase.from("events")
     .upsert(rows, { onConflict: "source_id,source_event_id" })
-    .select("id,source_event_id,title,start_at,end_at,venue,event_type,status,location_status");
+    .select("id,source_event_id,title,start_at,end_at,venue,event_type,status,location_status,duplicate_of");
   if (upsertError) return Response.json({ ok: false, error: upsertError.message }, { status: 500 });
 
-  const published = (imported ?? []).filter((event) => event.status === "published");
+  const published = (imported ?? []).filter((event) => event.status === "published" && !event.duplicate_of);
   let deduped = 0;
   let seriesCollapsed = 0;
   const dedupeExamples: Array<Record<string, unknown>> = [];
@@ -336,9 +362,12 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  await supabase.from("sources").update({ last_synced_at: nowIso, updated_at: nowIso }).eq("id", source.id);
+  if (!failures.length) {
+    const { error: syncError } = await supabase.from("sources").update({ last_synced_at: nowIso, updated_at: nowIso }).eq("id", source.id);
+    if (syncError) return Response.json({ ok: false, error: syncError.message }, { status: 500 });
+  }
   return Response.json({
-    ok: true, discovered: urls.size, imported: rows.length,
+    ok: failures.length === 0, discovered: urls.size, imported: rows.length,
     hidden_out_of_area: rows.filter((x) => x.location_status === "out_of_area").length,
     failed: failures.length, deduped, series_collapsed: seriesCollapsed,
     dedupe_examples: dedupeExamples, failures: failures.slice(0, 10),
