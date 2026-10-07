@@ -3,6 +3,7 @@ import LocalizedHome from "../LocalizedHome";
 import { getCopy } from "../../lib/i18n";
 
 const LANGUAGES = ["en", "de", "it"];
+export const revalidate = 300;
 
 export function generateStaticParams() {
   return LANGUAGES.map((lang) => ({ lang }));

@@ -28,7 +28,7 @@ function displayText(value) {
 }
 
 function EventCard({ event, copy, lang }) {
-  const shownTime = event.eventType === "single" && event.time === "00:00"
+  const shownTime = event.eventType === "single" && event.allDay
     ? (ALL_DAY_COPY[lang] || ALL_DAY_COPY.sl)
     : event.time;
   const shownTitle = displayText(event.title);

@@ -2,6 +2,7 @@ import LocalizedHome from "./LocalizedHome";
 import { getCopy } from "../lib/i18n";
 
 const copy = getCopy("sl");
+export const revalidate = 300;
 
 export const metadata = {
   title: copy.metaTitle,
