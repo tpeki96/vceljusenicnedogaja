@@ -3,14 +3,19 @@ import styles from "./SourcesPage.module.css";
 const SUPABASE_URL = "https://awyberrgkaaawxfgquvd.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_49txmxFiwCggw-XyTFlssA_BthU47_o";
 
+// The source's role is independent of how its pages are imported (HTML/API/etc.).
+// These services collect events from other organisers; clubs, venues and
+// official federations publish primary calendars of their own programmes.
+const AGGREGATOR_SOURCE_KEYS = new Set(["cele", "celje-info", "visit-celje"]);
+
 const COPY = {
   sl: {
     eyebrow: "PREGLED VIROV",
     title: "Od kod dobimo dogodke?",
     intro: "Dogodke samodejno zbiramo iz javno objavljenih koledarjev organizatorjev, prizorišč in lokalnih informacijskih portalov. Kadar isti dogodek najdemo večkrat, objave združimo in prednost damo neposrednemu viru organizatorja.",
-    direct: "Neposredni viri organizatorjev",
+    direct: "Primarni viri organizatorjev in športnih zvez",
     other: "Lokalni koledarji in agregatorji",
-    directHint: "Podatke pridobivamo neposredno iz javnega koledarja ali podatkovnega vira organizatorja oziroma prizorišča.",
+    directHint: "Podatke pridobivamo iz javnih koledarjev organizatorjev, prizorišč, klubov in uradnih športnih zvez.",
     otherHint: "Ti viri nam pomagajo odkriti dogodke, ki še niso zajeti pri neposrednih virih.",
     back: "← Nazaj na dogodke",
     note: "Seznam prikazuje trenutno aktivne vire in se samodejno spreminja skupaj s sistemom uvoza.",
@@ -22,9 +27,9 @@ const COPY = {
     eyebrow: "SOURCE OVERVIEW",
     title: "Where do the events come from?",
     intro: "We automatically collect events from publicly available calendars run by organisers, venues and local information services. When the same event appears more than once, we merge the listings and prefer the organiser's direct source.",
-    direct: "Direct organiser sources",
+    direct: "Primary organiser and sports federation sources",
     other: "Local calendars and aggregators",
-    directHint: "Data comes directly from the public calendar or data feed of the organiser or venue.",
+    directHint: "Data comes from public calendars of organisers, venues, clubs and official sports federations.",
     otherHint: "These sources help us discover events not yet covered by direct sources.",
     back: "← Back to events",
     note: "This list shows the currently active sources and updates automatically with the import system.",
@@ -36,9 +41,9 @@ const COPY = {
     eyebrow: "QUELLENÜBERSICHT",
     title: "Woher kommen die Veranstaltungen?",
     intro: "Wir sammeln Veranstaltungen automatisch aus öffentlich zugänglichen Kalendern von Veranstaltern, Spielstätten und lokalen Informationsdiensten. Mehrfach veröffentlichte Veranstaltungen werden zusammengeführt; bevorzugt wird die direkte Quelle des Veranstalters.",
-    direct: "Direkte Veranstalterquellen",
+    direct: "Primärquellen von Veranstaltern und Sportverbänden",
     other: "Lokale Kalender und Aggregatoren",
-    directHint: "Die Daten stammen direkt aus dem öffentlichen Kalender oder Datenfeed des Veranstalters bzw. der Spielstätte.",
+    directHint: "Die Daten stammen aus öffentlichen Kalendern von Veranstaltern, Spielstätten, Vereinen und offiziellen Sportverbänden.",
     otherHint: "Diese Quellen helfen uns, Veranstaltungen zu entdecken, die noch nicht über direkte Quellen erfasst sind.",
     back: "← Zurück zu den Veranstaltungen",
     note: "Die Liste zeigt die derzeit aktiven Quellen und aktualisiert sich automatisch mit dem Importsystem.",
@@ -50,9 +55,9 @@ const COPY = {
     eyebrow: "PANORAMICA DELLE FONTI",
     title: "Da dove arrivano gli eventi?",
     intro: "Raccogliamo automaticamente gli eventi dai calendari pubblici di organizzatori, sedi e servizi informativi locali. Quando lo stesso evento compare più volte, uniamo le pubblicazioni e diamo priorità alla fonte diretta dell'organizzatore.",
-    direct: "Fonti dirette degli organizzatori",
+    direct: "Fonti primarie di organizzatori e federazioni sportive",
     other: "Calendari locali e aggregatori",
-    directHint: "I dati provengono direttamente dal calendario pubblico o dal feed dell'organizzatore o della sede.",
+    directHint: "I dati provengono dai calendari pubblici di organizzatori, sedi, club e federazioni sportive ufficiali.",
     otherHint: "Queste fonti ci aiutano a scoprire eventi non ancora coperti dalle fonti dirette.",
     back: "← Torna agli eventi",
     note: "L'elenco mostra le fonti attualmente attive e si aggiorna automaticamente con il sistema di importazione.",
@@ -118,8 +123,8 @@ function SourceList({ sources, lang, copy }) {
 export default async function SourcesPage({ lang = "sl" }) {
   const copy = COPY[lang] || COPY.sl;
   const sources = await fetchSources();
-  const direct = sources.filter((source) => source.import_method?.startsWith("direct_"));
-  const other = sources.filter((source) => !source.import_method?.startsWith("direct_"));
+  const direct = sources.filter((source) => !AGGREGATOR_SOURCE_KEYS.has(source.key));
+  const other = sources.filter((source) => AGGREGATOR_SOURCE_KEYS.has(source.key));
   const home = lang === "sl" ? "/" : `/${lang}`;
 
   return (
