@@ -156,3 +156,7 @@
     border-right: 0;
   }
 }
+.warning {
+  color: #a02d16;
+  font-weight: 700;
+}

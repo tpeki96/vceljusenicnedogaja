@@ -1,0 +1,59 @@
+name: Event data health
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/audit-events.py', '.github/workflows/event-health.yml']
+  schedule:
+    - cron: '43 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: event-health
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check public sources and events
+        id: audit
+        continue-on-error: true
+        run: python3 scripts/audit-events.py --output /tmp/celje-audit.json
+      - name: Save audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-health-report
+          path: /tmp/celje-audit.json
+          retention-days: 30
+      - name: Update one monitoring issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('/tmp/celje-audit.json', 'utf8'));
+            const marker = '<!-- celje-event-health -->';
+            const issues = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state:'all', per_page:100});
+            const existing = issues.find(issue => !issue.pull_request && issue.body?.includes(marker) && issue.user?.login === 'github-actions[bot]');
+            if (existing) {
+              const match = existing.body.match(/<!-- baseline:(.*?) -->/);
+              if (match && report.counts_by_source) {
+                const previous = JSON.parse(match[1]);
+                for (const [source, count] of Object.entries(report.counts_by_source)) {
+                  if (previous[source] >= 10 && count < previous[source] * .3) report.findings.push({kind:'count_drop', source, previous:previous[source], current:count});
+                }
+              }
+            }
+            const summary = report.findings.map(item => '- ' + JSON.stringify(item)).join('\n') || 'Brez zaznanih težav.';
+            const baseline = report.counts_by_source || (existing?.body.match(/<!-- baseline:(.*?) -->/) ? JSON.parse(existing.body.match(/<!-- baseline:(.*?) -->/)[1]) : {});
+            const body = `${marker}\nZadnji pregled: ${report.checked_at}\n\n${summary.slice(0,45000)}\n\nPregled je samo za branje. Kandidati za duplikate, odpovedi in lokacije zahtevajo preverjanje pri izvoru. Svež čas osvežitve ne dokazuje, da je uvoz uspel v celoti.\n\n[Celotno poročilo](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n\n<!-- baseline:${JSON.stringify(baseline)} -->`;
+            if (existing) await github.rest.issues.update({...context.repo, issue_number:existing.number, body, state:report.findings.length ? 'open':'closed'});
+            else if (report.findings.length) await github.rest.issues.create({...context.repo, title:'Nadzor dogodkov: viri in kakovost podatkov', body});
+            await core.summary.addHeading('Event data health').addRaw(summary).write();
+      - name: Mark unavailable audit as failed
+        if: steps.audit.outcome == 'failure'
+        run: exit 1

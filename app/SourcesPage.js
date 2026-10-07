@@ -72,7 +72,7 @@ async function fetchSources() {
     headers: { apikey: SUPABASE_PUBLISHABLE_KEY },
     next: { revalidate: 300 },
   });
-  if (!response.ok) return [];
+  if (!response.ok) throw new Error("Source data is temporarily unavailable");
   return response.json();
 }
 
@@ -89,15 +89,23 @@ function formatSynced(value, lang) {
 }
 
 function SourceList({ sources, lang, copy }) {
+  const healthCopy = {
+    sl: { stale: "Vir se ni osvežil več kot 18 ur", never: "Osvežitev še ni potrjena" },
+    en: { stale: "Source has not refreshed for over 18 hours", never: "Refresh not confirmed yet" },
+    de: { stale: "Seit über 18 Stunden nicht aktualisiert", never: "Aktualisierung noch nicht bestätigt" },
+    it: { stale: "Fonte non aggiornata da oltre 18 ore", never: "Aggiornamento non ancora confermato" },
+  }[lang] || { stale: "Vir se ni osvežil več kot 18 ur", never: "Osvežitev še ni potrjena" };
   return (
     <div className={styles.list}>
       {sources.map((source) => {
         const synced = formatSynced(source.last_synced_at, lang);
+        const stale = source.last_synced_at && Date.now() - new Date(source.last_synced_at).getTime() > 18 * 3600000;
         return (
           <a className={styles.card} href={source.base_url} target="_blank" rel="noreferrer" key={source.key}>
             <div>
               <strong>{source.name}</strong>
               <span>{synced ? `${copy.updated}: ${synced}` : copy.never}</span>
+              {(stale || !synced) && <span className={styles.warning}>{stale ? healthCopy.stale : healthCopy.never}</span>}
             </div>
             <b aria-hidden="true">↗</b>
           </a>
